@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa Inteligente · Acompanhamento Pedagógico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blue:#2563eb;--blue-light:#eff6ff;--blue-mid:#bfdbfe;
+    --green:#16a34a;--green-light:#f0fdf4;
+    --amber:#d97706;--amber-light:#fffbeb;
+    --red:#dc2626;--red-light:#fef2f2;
+    --purple:#7c3aed;--purple-light:#f5f3ff;
+    --gray-50:#f8fafc;--gray-100:#f1f5f9;--gray-200:#e2e8f0;
+    --gray-300:#cbd5e1;--gray-400:#94a3b8;--gray-500:#64748b;
+    --gray-600:#475569;--gray-700:#334155;--gray-800:#1e293b;--gray-900:#0f172a;
+    --radius:10px;--radius-lg:14px;--shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+    --shadow-lg:0 4px 16px rgba(0,0,0,.10);
+  }
+  body{font-family:'Inter',sans-serif;background:var(--gray-50);color:var(--gray-800);font-size:14px;line-height:1.5}
+  /* ── LAYOUT ── */
+  .app{display:flex;min-height:100vh}
+  .sidebar{width:220px;background:var(--gray-900);flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100}
+  .sidebar-logo{padding:22px 20px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .sidebar-logo h1{font-size:15px;font-weight:600;color:#fff;letter-spacing:-.2px}
+  .sidebar-logo p{font-size:11px;color:var(--gray-400);margin-top:2px}
+  .sidebar-nav{padding:12px 10px;flex:1}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--gray-400);font-size:13px;font-weight:500;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav-item.active{background:var(--blue);color:#fff}
+  .main{margin-left:220px;flex:1;display:flex;flex-direction:column}
+  .topbar{background:#fff;border-bottom:1px solid var(--gray-200);padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+  .topbar-title{font-size:16px;font-weight:600;color:var(--gray-900)}
+  .topbar-sub{font-size:12px;color:var(--gray-400);margin-top:1px}
+  .page{padding:28px;display:none}
+  .page.active{display:block}
+  /* ── CARDS ── */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+  .kpi-card{background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:20px 22px}
+  .kpi-label{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+  .kpi-val{font-size:28px;font-weight:600;color:var(--gray-900);line-height:1}
+  .kpi-sub{font-size:12px;color:var(--gray-400);margin-top:5px}
+  .kpi-card.blue .kpi-val{color:var(--blue)}
+  .kpi-card.green .kpi-val{color:var(--green)}
+  .kpi-card.amber .kpi-val{color:var(--amber)}
+  .kpi-card.purple .kpi-val{color:var(--purple)}
+  /* ── FORM CARD ── */
+  .card{background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:24px}
+  .card-title{font-size:14px;font-weight:600;color:var(--gray-900);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .form-grid.cols3{grid-template-columns:1fr 1fr 1fr}
+  .form-group{display:flex;flex-direction:column;gap:5px}
+  .form-group.full{grid-column:1/-1}
+  label{font-size:12px;font-weight:600;color:var(--gray-600);letter-spacing:.2px}
+  .input-wrap{position:relative}
+  input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;background:#fff;color:var(--gray-800);transition:border .15s,box-shadow .15s;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  /* ── AUTOCOMPLETE ── */
+  .autocomplete-box{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--gray-200);border-radius:8px;box-shadow:var(--shadow-lg);z-index:200;max-height:220px;overflow-y:auto;display:none}
+  .autocomplete-box.open{display:block}
+  .ac-item{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--gray-700);transition:background .1s;border-bottom:1px solid var(--gray-100)}
+  .ac-item:last-child{border-bottom:none}
+  .ac-item:hover,.ac-item.focused{background:var(--blue-light);color:var(--blue)}
+  .ac-item strong{color:var(--gray-900)}
+  .ac-meta{font-size:11px;color:var(--gray-400);margin-left:6px}
+  /* ── CALENDAR ── */
+  .calendar-wrap{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:200;padding:14px;width:268px;display:none}
+  .calendar-wrap.open{display:block}
+  .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .cal-header span{font-size:13px;font-weight:600;color:var(--gray-800)}
+  .cal-nav{background:none;border:1px solid var(--gray-200);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--gray-600);display:flex;align-items:center;justify-content:center;transition:background .1s}
+  .cal-nav:hover{background:var(--gray-100)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .cal-day-name{text-align:center;font-size:10px;font-weight:600;color:var(--gray-400);padding:4px 0;letter-spacing:.4px}
+  .cal-day{text-align:center;font-size:12px;padding:5px 2px;border-radius:6px;cursor:pointer;color:var(--gray-700);transition:background .1s;border:none;background:none;width:100%}
+  .cal-day:hover{background:var(--blue-light);color:var(--blue)}
+  .cal-day.selected{background:var(--blue);color:#fff;font-weight:600}
+  .cal-day.today{font-weight:600;color:var(--blue)}
+  .cal-day.other-month{color:var(--gray-300)}
+  /* ── TAGS auto-fill ── */
+  .auto-badge{display:inline-flex;align-items:center;gap:5px;background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:500;padding:4px 10px;border-radius:20px;margin-top:4px}
+  /* ── BUTTONS ── */
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;border:none;font-family:'Inter',sans-serif}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{background:#1d4ed8}
+  .btn-ghost{background:none;color:var(--gray-600);border:1px solid var(--gray-200)}
+  .btn-ghost:hover{background:var(--gray-50)}
+  .btn-danger{background:var(--red-light);color:var(--red);border:1px solid #fecaca}
+  .btn-danger:hover{background:#fee2e2}
+  .btn-sm{padding:6px 12px;font-size:12px}
+  /* ── TABLE ── */
+  .table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--gray-200)}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13px}
+  th{background:var(--gray-50);font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;text-align:left;border-bottom:1px solid var(--gray-200)}
+  td{padding:10px 14px;border-bottom:1px solid var(--gray-100);color:var(--gray-700);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--gray-50)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-blue{background:var(--blue-light);color:#1d4ed8}
+  .badge-green{background:var(--green-light);color:var(--green)}
+  .badge-amber{background:var(--amber-light);color:#92400e}
+  .badge-red{background:var(--red-light);color:var(--red)}
+  .nota-badge{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  /* ── CHARTS ── */
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:0}
+  .chart-card{background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:22px}
+  .chart-title{font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:16px}
+  /* ── PERFIL ALUNO ── */
+  .perfil-header{background:#fff;border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:24px;margin-bottom:20px;display:flex;align-items:center;gap:20px}
+  .perfil-avatar{width:56px;height:56px;border-radius:14px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0}
+  .perfil-name{font-size:18px;font-weight:700;color:var(--gray-900)}
+  .perfil-meta{font-size:13px;color:var(--gray-400);margin-top:3px}
+  .perfil-stats{margin-left:auto;display:flex;gap:24px;text-align:center}
+  .perfil-stat-val{font-size:22px;font-weight:700;color:var(--gray-900)}
+  .perfil-stat-lbl{font-size:11px;color:var(--gray-400);font-weight:500}
+  /* ── SEARCH ── */
+  .search-bar{display:flex;gap:12px;margin-bottom:20px;align-items:center}
+  .search-bar input{max-width:320px}
+  .filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+  .filter-row select{width:auto;min-width:140px}
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:28px;right:28px;background:var(--gray-900);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(20px);opacity:0;transition:all .25s;pointer-events:none}
+  #toast.show{transform:translateY(0);opacity:1}
+  /* ── MODAL ── */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:center;justify-content:center}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:var(--radius-lg);padding:28px;width:480px;max-width:95vw;box-shadow:var(--shadow-lg)}
+  .modal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:var(--gray-900)}
+  /* ── RESPONSIVE ── */
+  @media(max-width:900px){
+    .kpi-grid{grid-template-columns:1fr 1fr}
+    .charts-grid{grid-template-columns:1fr}
+    .form-grid.cols3{grid-template-columns:1fr 1fr}
+  }
+  /* scrollbar */
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--gray-200);border-radius:10px}
+  .nota-bar{height:6px;border-radius:3px;background:var(--gray-200);overflow:hidden;margin-top:4px}
+  .nota-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="app">
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <h1>Mapa Pedagógico</h1>
+    <p>Sistema de acompanhamento</p>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" onclick="goPage('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Painel geral
+    </button>
+    <button class="nav-item" onclick="goPage('registro',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Novo registro
+    </button>
+    <button class="nav-item" onclick="goPage('dados',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Registros
+    </button>
+    <button class="nav-item" onclick="goPage('alunos',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Alunos
+    </button>
+    <button class="nav-item" onclick="goPage('perfil',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Relatório individual
+    </button>
+  </nav>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main">
+<div class="topbar">
+  <div>
+    <div class="topbar-title" id="topbar-title">Painel geral</div>
+    <div class="topbar-sub" id="topbar-sub">Visão consolidada · 435 alunos cadastrados</div>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Exportar CSV
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════ DASHBOARD ════════════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="kpi-grid">
+    <div class="kpi-card blue"><div class="kpi-label">Total de alunos</div><div class="kpi-val" id="kpi-alunos">435</div><div class="kpi-sub">5 séries · 12 turmas</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Registros lançados</div><div class="kpi-val" id="kpi-regs">0</div><div class="kpi-sub" id="kpi-regs-sub">Nenhum ainda</div></div>
+    <div class="kpi-card amber"><div class="kpi-label">Média geral</div><div class="kpi-val" id="kpi-media">—</div><div class="kpi-sub">Todas as disciplinas</div></div>
+    <div class="kpi-card purple"><div class="kpi-label">Alunos avaliados</div><div class="kpi-val" id="kpi-avaliados">0</div><div class="kpi-sub" id="kpi-avaliados-pct">de 435</div></div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Distribuição de alunos por série</div>
+      <div style="position:relative;height:220px"><canvas id="chartSerie" role="img" aria-label="Distribuição por série">Gráfico de barras das séries.</canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Média por disciplina</div>
+      <div style="position:relative;height:220px"><canvas id="chartDisc" role="img" aria-label="Média por disciplina">Gráfico de médias.</canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Notas ao longo do tempo</div>
+      <div style="position:relative;height:200px"><canvas id="chartTempo" role="img" aria-label="Notas por data">Gráfico temporal.</canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Distribuição das notas</div>
+      <div style="position:relative;height:200px"><canvas id="chartHist" role="img" aria-label="Histograma de notas">Histograma.</canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ REGISTRO ════════════════ -->
+<div class="page" id="page-registro">
+  <div class="card" style="max-width:680px">
+    <div class="card-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Novo registro de desempenho
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Aluno</label>
+        <div class="input-wrap">
+          <input type="text" id="inp-aluno" placeholder="Digite o nome ou parte dele…" autocomplete="off" oninput="filterAlunos(this.value)" onkeydown="acKeydown(event)">
+          <div class="autocomplete-box" id="ac-box"></div>
+        </div>
+        <div id="aluno-badge" style="display:none"></div>
+      </div>
+      <div class="form-group">
+        <label>Série</label>
+        <input type="text" id="inp-serie" readonly placeholder="Preenchido automaticamente" style="background:var(--gray-50);color:var(--gray-500)">
+      </div>
+      <div class="form-group">
+        <label>Turma</label>
+        <input type="text" id="inp-turma" readonly placeholder="Preenchido automaticamente" style="background:var(--gray-50);color:var(--gray-500)">
+      </div>
+      <div class="form-group">
+        <label>Disciplina</label>
+        <select id="inp-disc">
+          <option value="">Selecione…</option>
+          <option>Português</option><option>Matemática</option><option>Ciências</option>
+          <option>História</option><option>Geografia</option><option>Inglês</option>
+          <option>Artes</option><option>Educação Física</option><option>Religião</option>
+          <option>Redação</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nota (0–10)</label>
+        <input type="number" id="inp-nota" min="0" max="10" step="0.1" placeholder="Ex: 7.5">
+      </div>
+      <div class="form-group full">
+        <label>Assunto / Conteúdo</label>
+        <input type="text" id="inp-assunto" placeholder="Ex: Frações, Revolução Francesa, Verbos…">
+      </div>
+      <div class="form-group full">
+        <label>Capacidade / Habilidade observada</label>
+        <input type="text" id="inp-capac" placeholder="Ex: Compreensão textual, Resolução de problemas, Participação…">
+      </div>
+      <div class="form-group">
+        <label>Data</label>
+        <div class="input-wrap">
+          <input type="text" id="inp-data" placeholder="dd/mm/aaaa" readonly style="cursor:pointer" onclick="toggleCal()">
+          <div class="calendar-wrap" id="cal-wrap"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observação (opcional)</label>
+        <input type="text" id="inp-obs" placeholder="Nota rápida…">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:22px">
+      <button class="btn btn-primary" onclick="salvarRegistro()">Salvar registro</button>
+      <button class="btn btn-ghost" onclick="limparForm()">Limpar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ DADOS ════════════════ -->
+<div class="page" id="page-dados">
+  <div class="filter-row">
+    <input type="text" placeholder="Buscar por aluno…" oninput="filtrarTabela(this.value)" style="max-width:220px">
+    <select onchange="filtrarTabela()" id="fil-serie"><option value="">Todas as séries</option><option>5º EF</option><option>6º EF</option><option>7º EF</option><option>8º EF</option><option>9º EF</option></select>
+    <select onchange="filtrarTabela()" id="fil-disc"><option value="">Todas as disciplinas</option></select>
+    <button class="btn btn-danger btn-sm" onclick="limparTodosRegistros()" style="margin-left:auto">Limpar tudo</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Aluno</th><th>Série</th><th>Turma</th><th>Disciplina</th><th>Assunto</th><th>Capacidade</th><th>Nota</th><th>Data</th><th></th>
+      </tr></thead>
+      <tbody id="tabela-body">
+        <tr><td colspan="9" style="text-align:center;color:var(--gray-400);padding:32px">Nenhum registro ainda. Vá em <strong>Novo registro</strong> para começar.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════════════ ALUNOS ════════════════ -->
+<div class="page" id="page-alunos">
+  <div class="search-bar">
+    <input type="text" placeholder="Buscar aluno…" oninput="filtrarAlunos(this.value)" style="max-width:280px">
+    <select onchange="filtrarAlunos()" id="fil-aluno-serie"><option value="">Todas as séries</option><option>5º EF</option><option>6º EF</option><option>7º EF</option><option>8º EF</option><option>9º EF</option></select>
+    <select onchange="filtrarAlunos()" id="fil-aluno-turma"><option value="">Todas as turmas</option><option>A</option><option>B</option><option>C</option></select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Nome</th><th>Série</th><th>Turma</th><th>Registros</th><th>Média</th><th></th></tr></thead>
+      <tbody id="alunos-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════════════ PERFIL ════════════════ -->
+<div class="page" id="page-perfil">
+  <div class="card" style="max-width:400px;margin-bottom:24px">
+    <div class="card-title">Selecionar aluno para análise</div>
+    <div class="input-wrap">
+      <input type="text" id="perfil-search" placeholder="Digite o nome…" oninput="filterPerfilAlunos(this.value)" autocomplete="off">
+      <div class="autocomplete-box" id="perfil-ac-box"></div>
+    </div>
+  </div>
+  <div id="perfil-content" style="display:none">
+    <div class="perfil-header">
+      <div class="perfil-avatar" id="perfil-avatar">—</div>
+      <div>
+        <div class="perfil-name" id="perfil-nome">—</div>
+        <div class="perfil-meta" id="perfil-meta">—</div>
+      </div>
+      <div class="perfil-stats">
+        <div><div class="perfil-stat-val" id="pstat-regs">0</div><div class="perfil-stat-lbl">Registros</div></div>
+        <div><div class="perfil-stat-val" id="pstat-media">—</div><div class="perfil-stat-lbl">Média geral</div></div>
+        <div><div class="perfil-stat-val" id="pstat-disc">0</div><div class="perfil-stat-lbl">Disciplinas</div></div>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Evolução das notas</div>
+        <div style="position:relative;height:220px"><canvas id="pChartEvolucao" role="img" aria-label="Evolução do aluno">Evolução por data.</canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Desempenho por disciplina</div>
+        <div style="position:relative;height:220px"><canvas id="pChartDisc" role="img" aria-label="Notas por disciplina">Médias por disciplina.</canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="card-title">Histórico de registros</div>
+      <div class="table-wrap" style="border:none;border-radius:0;margin:-8px -4px">
+        <table><thead><tr><th>Data</th><th>Disciplina</th><th>Assunto</th><th>Capacidade</th><th>Nota</th></tr></thead>
+        <tbody id="perfil-hist"></tbody></table>
+      </div>
+    </div>
+  </div>
+  <div id="perfil-empty" style="text-align:center;padding:60px 0;color:var(--gray-400)">
+    Pesquise um aluno acima para ver o relatório individual completo.
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+const STUDENTS = [{"Aluno":"ANA CLARA ANDRADE LEMOS","Serie":"5º EF","Turma":"A"},{"Aluno":"AYLLA PRISCILA MOURA LOPES","Serie":"5º EF","Turma":"A"},{"Aluno":"BENJAMIM MIGUEL DE LIMA SANTANA","Serie":"5º EF","Turma":"A"},{"Aluno":"BENJAMIN DOMINGOS ALBUQUERQUE BEZERRA","Serie":"5º EF","Turma":"A"},{"Aluno":"BERNARDO FERREIRA DE MELO","Serie":"5º EF","Turma":"A"},{"Aluno":"BRUNO GABRIEL SILVA DE ARRUDA","Serie":"5º EF","Turma":"A"},{"Aluno":"DANIEL BERNARDO MELO DE OLIVEIRA","Serie":"5º EF","Turma":"A"},{"Aluno":"DAVI GONÇALVES OLIVEIRA VALADA","Serie":"5º EF","Turma":"A"},{"Aluno":"DAVI LUCAS DE LIRA ARAUJO","Serie":"5º EF","Turma":"A"},{"Aluno":"DOMINIQUE DE ARAÚJO FONSÊCA","Serie":"5º EF","Turma":"A"},{"Aluno":"ELIDA ALINE DE SOUZA MARTINS","Serie":"5º EF","Turma":"A"},{"Aluno":"EMILIA LARISSA FERREIRA BEZERRA DA SILVA","Serie":"5º EF","Turma":"A"},{"Aluno":"ENZO BERNARDO SILVA MELO","Serie":"5º EF","Turma":"A"},{"Aluno":"ENZO ÍCARO DOS SANTOS NASCIMENTO","Serie":"5º EF","Turma":"A"},{"Aluno":"GABRIEL SANTINO","Serie":"5º EF","Turma":"A"},{"Aluno":"GUILHERME FELIPE DOS SANTOS NUNES SERRA","Serie":"5º EF","Turma":"A"},{"Aluno":"IAN LUCA RODRIGUES COSTA FREIRE","Serie":"5º EF","Turma":"A"},{"Aluno":"JHONATHAN JOAQUIM TEIXEIRA DE ANDRADE","Serie":"5º EF","Turma":"A"},{"Aluno":"JOÃO HENRIQUE CHARAMBA DE OLIVEIRA","Serie":"5º EF","Turma":"A"},{"Aluno":"JULIA REBECA DA SILVA MENDES","Serie":"5º EF","Turma":"A"},{"Aluno":"LUCAS SOUZA FIRMINO SILVA","Serie":"5º EF","Turma":"A"},{"Aluno":"LÉVISON JOSÉ AROUXA FILHO","Serie":"5º EF","Turma":"A"},{"Aluno":"MACSON DIEGO DE SANTANA SILVA FILHO","Serie":"5º EF","Turma":"A"},{"Aluno":"MAGDIEL VICTOR VICENTE DA SILVA","Serie":"5º EF","Turma":"A"},{"Aluno":"MARIA BIANCA ALVES SALES","Serie":"5º EF","Turma":"A"},{"Aluno":"MARIA LUIZA FELIX LEMOS","Serie":"5º EF","Turma":"A"},{"Aluno":"MATHEUS ANTÔNIO LOURENÇO DE SANTANA","Serie":"5º EF","Turma":"A"},{"Aluno":"MIGUEL BARROS DA SILVA","Serie":"5º EF","Turma":"A"},{"Aluno":"NAYRA KÁROLY DA SILVA SANTOS","Serie":"5º EF","Turma":"A"},{"Aluno":"OTÁVIO HENRIQUE FERREIRA SOARES","Serie":"5º EF","Turma":"A"},{"Aluno":"PEDRO HENRIQUE DOS SANTOS","Serie":"5º EF","Turma":"A"},{"Aluno":"PHIERRY JOSÉ SANTANA LEITE","Serie":"5º EF","Turma":"A"},{"Aluno":"RENATO JOSE PEREIRA DA SILVA","Serie":"5º EF","Turma":"A"},{"Aluno":"WAGNER ALBUQUERQUE RIBEIRO SIQUEIRA JUNIOR","Serie":"5º EF","Turma":"A"},{"Aluno":"WALTER FONSECA NETO","Serie":"5º EF","Turma":"A"},{"Aluno":"ALÍCIA RAFAELY MONTEIRO DE OLIVEIRA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"ANA BEATRIZ MACÊDO GONZAGA","Serie":"5º EF","Turma":"B"},{"Aluno":"ANA SOFIA DE PONTES LINS","Serie":"5º EF","Turma":"B"},{"Aluno":"ANTHONY PIETRO SANTOS CRUZ","Serie":"5º EF","Turma":"B"},{"Aluno":"CAMILLE LAIS DE SANTANA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"CAROLINA ASSUNÇÃO DE SANTANA","Serie":"5º EF","Turma":"B"},{"Aluno":"CAUÃ MIGUEL FERREIRA TOMAZ","Serie":"5º EF","Turma":"B"},{"Aluno":"CECÍLIA MACHADO DA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"EDUARDO HENRIQUE RUFINO DE BRITO SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"ELISA SILVA MONTEIRO","Serie":"5º EF","Turma":"B"},{"Aluno":"ESTHER KAROLINE PEREIRA DA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"GUILHERME NUNES DA SILVA FERREIRA","Serie":"5º EF","Turma":"B"},{"Aluno":"HEITOR LUCCAS DE PAULA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"HEITOR RODRIGUES PEREIRA DA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"JOANA EMANUELLE DOS SANTOS ARAÚJO","Serie":"5º EF","Turma":"B"},{"Aluno":"KAUANY VITÓRIA DOS SANTOS LIRA","Serie":"5º EF","Turma":"B"},{"Aluno":"LARA LEMOS DOS SANTOS DE OLIVEIRA","Serie":"5º EF","Turma":"B"},{"Aluno":"LAURA BEATRIZ DE SANTANA SANTOS","Serie":"5º EF","Turma":"B"},{"Aluno":"LAURA EMANUELLY FREIRE DA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"LEVI FELIPE DOS SANTOS","Serie":"5º EF","Turma":"B"},{"Aluno":"LEVYR ALEXANDRY LUIZ DA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"LILIAN VITORIA SILVA VIANA","Serie":"5º EF","Turma":"B"},{"Aluno":"LORENA MARIANA CAVALCANTI DOS SANTOS","Serie":"5º EF","Turma":"B"},{"Aluno":"LUCAS HENRIQUE DA SILVA LIMA","Serie":"5º EF","Turma":"B"},{"Aluno":"LUIZ FELIPE LINS DA CUNHA","Serie":"5º EF","Turma":"B"},{"Aluno":"LÁZARO DAVI BARROS DA SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"MAILA BEATRICE SILVA FERREIRA","Serie":"5º EF","Turma":"B"},{"Aluno":"MARIANA FERNANDES DE MELO SILVA","Serie":"5º EF","Turma":"B"},{"Aluno":"MARINA JÚLIA SILVA DOS SANTOS","Serie":"5º EF","Turma":"B"},{"Aluno":"MATHEUS REIS BRANDÃO","Serie":"5º EF","Turma":"B"},{"Aluno":"OLIVER TORRES CORREIA SOARES LUCENA","Serie":"5º EF","Turma":"B"},{"Aluno":"SARAH MARIA GOMES MACIEL","Serie":"5º EF","Turma":"B"},{"Aluno":"SOFIA LOUISE SANTOS DE LIMA","Serie":"5º EF","Turma":"B"},{"Aluno":"VICENTE JOSÉ PEREIRA DOS SANTOS OLIVEIRA","Serie":"5º EF","Turma":"B"},{"Aluno":"YANNA CECÍLIA BEZERRA","Serie":"5º EF","Turma":"B"},{"Aluno":"ÁLVARO ROQUE MACIEL MENDES","Serie":"5º EF","Turma":"B"},{"Aluno":"ALEFF DIOGO PEREIRA DA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"ALICE BEATRIZ DA SILVA SANTOS","Serie":"6º EF","Turma":"A"},{"Aluno":"ANTONIO RAFAEL FRANÇA DOS SANTOS SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"ARYANNE REBEKA ARAUJO SOUZA","Serie":"6º EF","Turma":"A"},{"Aluno":"CELESTE KEROLAYNE DE OLIVEIRA RAMOS","Serie":"6º EF","Turma":"A"},{"Aluno":"DANIEL VHITORIO MENDES RODRIGUES","Serie":"6º EF","Turma":"A"},{"Aluno":"DAVI HENRIQUE DA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"DAVI LUIS SILVA DE ANDRADE","Serie":"6º EF","Turma":"A"},{"Aluno":"DAVI LUIZ ALCANTARA DE ARAUJO","Serie":"6º EF","Turma":"A"},{"Aluno":"DAVI PEREIRA COSTA DE LIMA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"ELIZA HADASSA DOS SANTOS SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"EMILLY SOPHIA DA SILVA LIMA","Serie":"6º EF","Turma":"A"},{"Aluno":"GABRIEL VINICIUS DE LIMA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"HADASSA VITORIA BARRETO SOARES","Serie":"6º EF","Turma":"A"},{"Aluno":"HEITOR JOSE DE OLIVEIRA","Serie":"6º EF","Turma":"A"},{"Aluno":"IAGO JOSEPH ALVES SALES","Serie":"6º EF","Turma":"A"},{"Aluno":"JOAO GABRIEL FRANÇA DOS SANTOS SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"JOÃO MIGUEL DOS SANTOS CORREIA","Serie":"6º EF","Turma":"A"},{"Aluno":"KAYLA LETICIA GOMES DO NASCIMENTO","Serie":"6º EF","Turma":"A"},{"Aluno":"LAURA CECILIA DE OLIVEIRA FARIAS","Serie":"6º EF","Turma":"A"},{"Aluno":"LUCAS FELIPE CARDEAL GOMES","Serie":"6º EF","Turma":"A"},{"Aluno":"LUCAS GABRIEL DA SILVA LEAL","Serie":"6º EF","Turma":"A"},{"Aluno":"LUIS GUILHERME SILVA CAVALCANTE","Serie":"6º EF","Turma":"A"},{"Aluno":"LUIZ MIGUEL DA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"MARIA ELIZABETH DIAS DE MORAIS","Serie":"6º EF","Turma":"A"},{"Aluno":"MARIA LAURA DA SILVA FRANÇA","Serie":"6º EF","Turma":"A"},{"Aluno":"MARIA LAURA JERONIMO SALES","Serie":"6º EF","Turma":"A"},{"Aluno":"MARIA LUIZA DA SILVA SOUZA","Serie":"6º EF","Turma":"A"},{"Aluno":"MARIA SOFIA DA SILVA BARBOSA","Serie":"6º EF","Turma":"A"},{"Aluno":"ORLANDO JOSE MESQUITA FILHO","Serie":"6º EF","Turma":"A"},{"Aluno":"PAOLA TARCILA DANTAS TEIXEIRA DA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"PYETRO GABRIEL MENDES DA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"THALLYS RUAN ALVES DA SILVA","Serie":"6º EF","Turma":"A"},{"Aluno":"WILLAMIS RIBEIRO VITORINO JUNIOR","Serie":"6º EF","Turma":"A"},{"Aluno":"ADRIELLY CRISTINA DIAS DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"ALICE BEATRIZ DIAS DA SILVA SANTOS","Serie":"6º EF","Turma":"B"},{"Aluno":"ALICE SOFIA DE LIRA CONCEIÇÃO","Serie":"6º EF","Turma":"B"},{"Aluno":"ANA BEATRIZ LOURENÇO MARQUES DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"ANA LUIZA DE ALBUQUERQUE","Serie":"6º EF","Turma":"B"},{"Aluno":"AYSHILLA LUIZA DAS DORES SANTOS SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"BENÍCIO NEPOMUCENO OLIVEIRA DOS SANTOS","Serie":"6º EF","Turma":"B"},{"Aluno":"CARLOS FELIPE OLIVEIRA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"EMILLE YASMIN PRAXEDES DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"EUCLIDES RIBEIRO SOBRAL NETO","Serie":"6º EF","Turma":"B"},{"Aluno":"GABRIEL SOARES LINS","Serie":"6º EF","Turma":"B"},{"Aluno":"GABRIELA GALDINO SAMICO","Serie":"6º EF","Turma":"B"},{"Aluno":"HADASSA ELLEN TENORIO DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"HELENA MOURA DOS SANTOS VIEIRA","Serie":"6º EF","Turma":"B"},{"Aluno":"ISABELLA DA SILVA SANTANA","Serie":"6º EF","Turma":"B"},{"Aluno":"ISABELLE BEATRIZ BEZERRA","Serie":"6º EF","Turma":"B"},{"Aluno":"JOSIANNY LEANDRA SANTOS","Serie":"6º EF","Turma":"B"},{"Aluno":"JOSÉ BRUNO SOUZA DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"JOÃO MIGUEL LIMA DE FRANÇA","Serie":"6º EF","Turma":"B"},{"Aluno":"JOÃO VÍTOR AQUINO DUARTE","Serie":"6º EF","Turma":"B"},{"Aluno":"JULIA RAFAELA DE ALBUQUERQUE TAVARES","Serie":"6º EF","Turma":"B"},{"Aluno":"KEMILYN EPITACIO DE SANTANA","Serie":"6º EF","Turma":"B"},{"Aluno":"LARISSA BEATRIZ PEREIRA DA ROCHA","Serie":"6º EF","Turma":"B"},{"Aluno":"LAURA SOPHIA FERREIRA SANTANA","Serie":"6º EF","Turma":"B"},{"Aluno":"LUIZ MIGUEL FERREIRA ALVES","Serie":"6º EF","Turma":"B"},{"Aluno":"LUIZ MIGUEL SANTANA DE LIMA","Serie":"6º EF","Turma":"B"},{"Aluno":"MARIA CECILIA GOMES DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"MARIA CECÍLIA ANDRADE LEITÃO","Serie":"6º EF","Turma":"B"},{"Aluno":"RAFAEL LUIZ DA SILVA","Serie":"6º EF","Turma":"B"},{"Aluno":"VALENTINA FERNANDA SANTOS FEITOZA","Serie":"6º EF","Turma":"B"},{"Aluno":"YAN GABRIEL SOUZA SANTOS","Serie":"6º EF","Turma":"B"},{"Aluno":"ALEXANDRE PEREIRA DA SILVA JUNIOR","Serie":"6º EF","Turma":"C"},{"Aluno":"ALLANNA MARIA PORTELA TOSCANO DE BRITO","Serie":"6º EF","Turma":"C"},{"Aluno":"ANA CLARA FERREIRA DE SALES","Serie":"6º EF","Turma":"C"},{"Aluno":"ANTONY FELIX DA SILVA NASCIMENTO","Serie":"6º EF","Turma":"C"},{"Aluno":"ARTHUR LUIS DE BRITO","Serie":"6º EF","Turma":"C"},{"Aluno":"ARTHUR LUIZ DE FRANÇA DA SILVA","Serie":"6º EF","Turma":"C"},{"Aluno":"ARTHUR SAMUEL ALBUQUERQUE DA SILVA","Serie":"6º EF","Turma":"C"},{"Aluno":"AYRLLA LAUANNY GOMES PINTO","Serie":"6º EF","Turma":"C"},{"Aluno":"DAVI GABRIEL DE FARIAS SANTOS","Serie":"6º EF","Turma":"C"},{"Aluno":"DAVI LUCCA AMORIM DE ALBUQUERQUE","Serie":"6º EF","Turma":"C"},{"Aluno":"DAVI PEDRO LINS DAVINO","Serie":"6º EF","Turma":"C"},{"Aluno":"EMERSON MIGUEL SOUZA MARCIEL","Serie":"6º EF","Turma":"C"},{"Aluno":"ENZO MIGUEL DE FREITAS NASCIMENTO","Serie":"6º EF","Turma":"C"},{"Aluno":"EVERTON LUIZ DE SOUZA","Serie":"6º EF","Turma":"C"},{"Aluno":"FABRICIO DA SILVA MARQUES","Serie":"6º EF","Turma":"C"},{"Aluno":"ISADORA SOFIA DA SILVA PINTO","Serie":"6º EF","Turma":"C"},{"Aluno":"JOÃO MANOEL VEIGA DE CARVALHO","Serie":"6º EF","Turma":"C"},{"Aluno":"JOÃO VICENTE DE OLIVEIRA NETO","Serie":"6º EF","Turma":"C"},{"Aluno":"JULIA MIRELLE VIEIRA ESTEVES GOMES","Serie":"6º EF","Turma":"C"},{"Aluno":"KETILY RODRIGUES DA SILVA CRUZ","Serie":"6º EF","Turma":"C"},{"Aluno":"LUIZ FELIPE DAMASCENO DE LEMOS","Serie":"6º EF","Turma":"C"},{"Aluno":"LUIZA HELENA MARTINS BUENO","Serie":"6º EF","Turma":"C"},{"Aluno":"MARCOS ANTONIO DE ALMEIDA OLIVEIRA JUNIOR","Serie":"6º EF","Turma":"C"},{"Aluno":"MARIA CECÍLIA DE OLIVEIRA GOMES","Serie":"6º EF","Turma":"C"},{"Aluno":"MARIANA LINS DA SILVA","Serie":"6º EF","Turma":"C"},{"Aluno":"MARIANA PEIXOTO ALMEIDA","Serie":"6º EF","Turma":"C"},{"Aluno":"MATEUS HENRIQUE FEIJÓ BELARMINO","Serie":"6º EF","Turma":"C"},{"Aluno":"MURILO HENRIQUE DE OLIVEIRA EVANGELISTA","Serie":"6º EF","Turma":"C"},{"Aluno":"MÁRCIO VINÍCIUS SILVA DE CASTRO","Serie":"6º EF","Turma":"C"},{"Aluno":"PIETRA ARRUDA FEITOSA SILVA","Serie":"6º EF","Turma":"C"},{"Aluno":"RAPHAEL PEDRO DA SILVA ALCANTARA","Serie":"6º EF","Turma":"C"},{"Aluno":"SOFIA VITÓRIA DA SILVA AMORIM","Serie":"6º EF","Turma":"C"},{"Aluno":"THALLES FELIPE CAVALCANTE DA SILVA","Serie":"6º EF","Turma":"C"},{"Aluno":"VINICIUS KAUÊ PIMENTEL LIMA","Serie":"6º EF","Turma":"C"},{"Aluno":"ANA CLARA FERNANDES DA SILVA","Serie":"7º EF","Turma":"A"},{"Aluno":"ANGELO HENRIQUE DA COSTA SOARES","Serie":"7º EF","Turma":"A"},{"Aluno":"DAVI GUILHERME LIMA SOUZA","Serie":"7º EF","Turma":"A"},{"Aluno":"DAVI LUCAS ALVES DA SILVA","Serie":"7º EF","Turma":"A"},{"Aluno":"DAVID VALERIO SANTOS DA SILVA","Serie":"7º EF","Turma":"A"},{"Aluno":"DAYVISON HENRIQUE DE SOUZA SILVA","Serie":"7º EF","Turma":"A"},{"Aluno":"ELOAH GUEDES ALMEIDA MELO","Serie":"7º EF","Turma":"A"},{"Aluno":"ENZO ALVES DOS ANJOS ROSA","Serie":"7º EF","Turma":"A"},{"Aluno":"ESTHER MARIA DOS SANTOS CORREIA","Serie":"7º EF","Turma":"A"},{"Aluno":"GUILHERME NATALICIO SILVA DE ANDRADE","Serie":"7º EF","Turma":"A"},{"Aluno":"GUILHERME QUIRINO DO CARMO","Serie":"7º EF","Turma":"A"},{"Aluno":"HADASSA RENNALLY TENÓRIO DE SOUSA","Serie":"7º EF","Turma":"A"},{"Aluno":"HEITOR CHAVES OLIVEIRA","Serie":"7º EF","Turma":"A"},{"Aluno":"JAMILE CUNHA DA SILVA","Serie":"7º EF","Turma":"A"},{"Aluno":"JHULIA KETLLYN DA SILVA SANTOS","Serie":"7º EF","Turma":"A"},{"Aluno":"JOAO MIGUEL BATISTA SANTANA","Serie":"7º EF","Turma":"A"},{"Aluno":"LARISSA CAROLYNE DA SILVA SANTOS","Serie":"7º EF","Turma":"A"},{"Aluno":"LAVÍNYA HELOYSE RODRIGUES DOS SANTOS","Serie":"7º EF","Turma":"A"},{"Aluno":"LAYLLA NATHALLYA OLIVEIRA DE ABREU","Serie":"7º EF","Turma":"A"},{"Aluno":"LIVIA FERREIRA CORDEIRO","Serie":"7º EF","Turma":"A"},{"Aluno":"LUCAS AVELINO DA SILVA","Serie":"7º EF","Turma":"A"},{"Aluno":"LUCAS MELO DE AMORIM","Serie":"7º EF","Turma":"A"},{"Aluno":"LUIZA NACRE DE FREITAS","Serie":"7º EF","Turma":"A"},{"Aluno":"MAIARA VITÓRIA FERREIRA DE JESUS","Serie":"7º EF","Turma":"A"},{"Aluno":"MARIA HELENA GOMES DE MELO","Serie":"7º EF","Turma":"A"},{"Aluno":"MELISSA VITÓRIA ALMEIDA DO NASCIMENTO","Serie":"7º EF","Turma":"A"},{"Aluno":"PEDRO HENRIQUE RODRIGUES DA SILVA MORAIS","Serie":"7º EF","Turma":"A"},{"Aluno":"PEDRO SENA NASCIMENTO","Serie":"7º EF","Turma":"A"},{"Aluno":"REGINALDO JOSÉ DA SILVA NETO","Serie":"7º EF","Turma":"A"},{"Aluno":"RICARDO AUGUSTO ABREU AZEVEDO TORRES DE SANTANA","Serie":"7º EF","Turma":"A"},{"Aluno":"RICHARD LINDEMBERG DE LIMA MELO","Serie":"7º EF","Turma":"A"},{"Aluno":"SAMUEL GUILHERME FERREIRA DA HORA","Serie":"7º EF","Turma":"A"},{"Aluno":"SAMUEL VINICIUS DOS SANTOS","Serie":"7º EF","Turma":"A"},{"Aluno":"THAUANY DAFFNY ALEXANDRE DE ABDIAS","Serie":"7º EF","Turma":"A"},{"Aluno":"VICTOR HUGO SILVA DE LIMA","Serie":"7º EF","Turma":"A"},{"Aluno":"VITOR FIDELIS ENEDINO MARQUES","Serie":"7º EF","Turma":"A"},{"Aluno":"AGNES WYLDS CAMPOS DE LIMA","Serie":"7º EF","Turma":"B"},{"Aluno":"ALYCE BEATRIZ JUSTINO DOS SANTOS","Serie":"7º EF","Turma":"B"},{"Aluno":"ASLAN LIRA DOS SANTOS","Serie":"7º EF","Turma":"B"},{"Aluno":"BRUNO LUCAS DE SOUZA CALADO","Serie":"7º EF","Turma":"B"},{"Aluno":"CECÍLIA BATISTA SOUZA SENA","Serie":"7º EF","Turma":"B"},{"Aluno":"DANILO CORREIA E SILVA","Serie":"7º EF","Turma":"B"},{"Aluno":"DAVI GUILHERME ROCHA DO NASCIMENTO","Serie":"7º EF","Turma":"B"},{"Aluno":"DAVI SILVA REIS","Serie":"7º EF","Turma":"B"},{"Aluno":"DEBORA JULIA MARINHO DE OLIVEIRA","Serie":"7º EF","Turma":"B"},{"Aluno":"DOUGLAS EMMANUEL SANTOS AGUIAR","Serie":"7º EF","Turma":"B"},{"Aluno":"EVA SOPHIA DE SOUZA GOMES","Serie":"7º EF","Turma":"B"},{"Aluno":"FELIPE GABRIEL DOS SANTOS SILVA","Serie":"7º EF","Turma":"B"},{"Aluno":"FERNANDA KEVELLYN DA SILVA FERREIRA","Serie":"7º EF","Turma":"B"},{"Aluno":"GIOVANNA CAMPELO LINGNER","Serie":"7º EF","Turma":"B"},{"Aluno":"GUILHERME VYNYCIOS GOMES DE MELO","Serie":"7º EF","Turma":"B"},{"Aluno":"HEITOR SILVA NASCIMENTO","Serie":"7º EF","Turma":"B"},{"Aluno":"ISABELLA FAGUNDES NOGUEIRA BARROS","Serie":"7º EF","Turma":"B"},{"Aluno":"ISADORA BARBOZA SANTOS DA SILVA","Serie":"7º EF","Turma":"B"},{"Aluno":"LARISSA KAREN DA SILVA","Serie":"7º EF","Turma":"B"},{"Aluno":"LAURA CRISTINE DO NASCIMENTO SILVA","Serie":"7º EF","Turma":"B"},{"Aluno":"LORENA DE LIMA FREITAS","Serie":"7º EF","Turma":"B"},{"Aluno":"LUCAS GABRIEL DE ARRUDA FARIAS","Serie":"7º EF","Turma":"B"},{"Aluno":"MARIA EDUARDA FÉLIX BATISTA","Serie":"7º EF","Turma":"B"},{"Aluno":"MARIA EDUARDA SOUZA DA CUNHA","Serie":"7º EF","Turma":"B"},{"Aluno":"MARÍLIA ISABELLY OLIVEIRA FERRAZ","Serie":"7º EF","Turma":"B"},{"Aluno":"MIRELLY VITORIA DE SOUZA CAVALCANTE","Serie":"7º EF","Turma":"B"},{"Aluno":"MOISES TERTO DE LIMA NETO","Serie":"7º EF","Turma":"B"},{"Aluno":"PALLOMA BEATRIZ BARRETO SANTOS","Serie":"7º EF","Turma":"B"},{"Aluno":"RAYSSA ALVES DE LIMA","Serie":"7º EF","Turma":"B"},{"Aluno":"SARAH AIMÊ SANTOS DE ALBUQUERQUE","Serie":"7º EF","Turma":"B"},{"Aluno":"SOPHIA HALANA TAVARES DE LIMA","Serie":"7º EF","Turma":"B"},{"Aluno":"THOR GABRIEL DOS SANTOS CHATEAUBRIAND","Serie":"7º EF","Turma":"B"},{"Aluno":"VICTOR GABRIEL NASCIMENTO RIBEIRO","Serie":"7º EF","Turma":"B"},{"Aluno":"VITORIA KAROLINE SANTANA DE LIMA","Serie":"7º EF","Turma":"B"},{"Aluno":"YURI HAVY CARVALHO DE LIMA","Serie":"7º EF","Turma":"B"},{"Aluno":"ALANA GABRIELY CAMPOS BATISTA","Serie":"8º EF","Turma":"A"},{"Aluno":"ALICE CRISTINA MARIA DA SILVA CONCEIÇÃO","Serie":"8º EF","Turma":"A"},{"Aluno":"ALICE FELICIANO DE SANTANA","Serie":"8º EF","Turma":"A"},{"Aluno":"ARTHUR LUCENA RIBEIRO","Serie":"8º EF","Turma":"A"},{"Aluno":"DANIEL JOAQUIM FERREIRA DOS SANTOS","Serie":"8º EF","Turma":"A"},{"Aluno":"DAVI LUCAS BARROS DA SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"DAVI LUCAS GUIMARAES DE LIMA","Serie":"8º EF","Turma":"A"},{"Aluno":"DOUGLAS ELIAS MONTEIRO DOS SANTOS","Serie":"8º EF","Turma":"A"},{"Aluno":"EDMAKSON MARQUES DA SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"ELLEN GABRIELLI DA SILVA SÁ","Serie":"8º EF","Turma":"A"},{"Aluno":"GEOAD CHARLES DA SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"GEOVANA VITORIA BARBOSA NOGUEIRA","Serie":"8º EF","Turma":"A"},{"Aluno":"HELIO GABRIEL FELIX DA SILVA SANTOS","Serie":"8º EF","Turma":"A"},{"Aluno":"IGOR RICHALIEU AMARAL DOS SANTOS","Serie":"8º EF","Turma":"A"},{"Aluno":"JOSIVALDO VICTOR DE OLIVEIRA CASTRO","Serie":"8º EF","Turma":"A"},{"Aluno":"JOSUE VINICIUS BELARMINO DA SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"LETICIA VITORIA SILVA NASCIMENTO","Serie":"8º EF","Turma":"A"},{"Aluno":"LUCAS MARIANO RAMOS","Serie":"8º EF","Turma":"A"},{"Aluno":"LUIZA RAPHAELLE SANTOS DO MONTE SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"MARIA JULIA DA SILVA SANTOS","Serie":"8º EF","Turma":"A"},{"Aluno":"MARIA LUIZA COELHO LIMA","Serie":"8º EF","Turma":"A"},{"Aluno":"NATHAN CESAR SOARES DE CARVALHO","Serie":"8º EF","Turma":"A"},{"Aluno":"RHAVI GUILHERME MARIANO SANTOS","Serie":"8º EF","Turma":"A"},{"Aluno":"RIAN ANTONI DA SILVA NASCIMENTO","Serie":"8º EF","Turma":"A"},{"Aluno":"RIAN RINALDY DE LIMA SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"RYAN RICARDO DA SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"SAMUEL MESSIAS DE JESUS SERGIO","Serie":"8º EF","Turma":"A"},{"Aluno":"SOPHIA HELLEN NUNES SILVA","Serie":"8º EF","Turma":"A"},{"Aluno":"SOPHIA NAIARA DE ALMEIDA BARBOZA","Serie":"8º EF","Turma":"A"},{"Aluno":"THALLYS EMMANOEL DE ALMEIDA COSTA","Serie":"8º EF","Turma":"A"},{"Aluno":"TICIANE TORRES DE SOBRAL","Serie":"8º EF","Turma":"A"},{"Aluno":"ADALY LARISSA MACESTE DA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"AGATHA HELOIZA SANTOS SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"ALLANA NICOLY BARROS DE MELO","Serie":"8º EF","Turma":"B"},{"Aluno":"ANA BEATRIZ BARRETO SOARES","Serie":"8º EF","Turma":"B"},{"Aluno":"ANTONIO RAFAEL BRITO SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"CARLOS EDUARDO NASCIMENTO DA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"DAVI SENA DE ALBUQUERQUE","Serie":"8º EF","Turma":"B"},{"Aluno":"DAVI VITOR SILVA VIANA","Serie":"8º EF","Turma":"B"},{"Aluno":"ENZZO BRANDON FLORENCIO MATOSO DE LIMA","Serie":"8º EF","Turma":"B"},{"Aluno":"EVELLY VITORIA PEREIRA DA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"FABIO AUGUSTO DE AZEVEDO SANTOS","Serie":"8º EF","Turma":"B"},{"Aluno":"GEOVANNA ROBERTA TEIXEIRA","Serie":"8º EF","Turma":"B"},{"Aluno":"GUILHERME HENRIQUE DA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"GUILHERME SANTOS OLIVEITRA","Serie":"8º EF","Turma":"B"},{"Aluno":"HEITOR DAVI FREIRE DE LIMA","Serie":"8º EF","Turma":"B"},{"Aluno":"ISABELLA PONTES DE OLIVEIRA","Serie":"8º EF","Turma":"B"},{"Aluno":"IZABEL SOPHIA BATISTA DO NASCIMENTO","Serie":"8º EF","Turma":"B"},{"Aluno":"JEAN VINICIOS LIMA GOMES","Serie":"8º EF","Turma":"B"},{"Aluno":"JHONATAS MIGUEL DE LIMA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"JOAO FILIPE SOARES TORRES DE ARAUJO","Serie":"8º EF","Turma":"B"},{"Aluno":"JONAS GABRIEL MARQUES BATISTA","Serie":"8º EF","Turma":"B"},{"Aluno":"JOSE PEDRO NUNES NETO","Serie":"8º EF","Turma":"B"},{"Aluno":"JULIA GABRIELLY FREITAS DE SANTANA","Serie":"8º EF","Turma":"B"},{"Aluno":"LEONARDO GABRIEL DA SILVA COSTA","Serie":"8º EF","Turma":"B"},{"Aluno":"LUIS OTÁVIO LINS DOS SANTOS","Serie":"8º EF","Turma":"B"},{"Aluno":"LUIZA VITORIA DA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"MARIA LIDIANE DE SOBRAL SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"MARIA LUIZA FERNANDES DE MELO MESQUITA","Serie":"8º EF","Turma":"B"},{"Aluno":"MARIA VITÓRIA DOS SANTOS SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"MATHEUS VICENTE SILVA LIMA","Serie":"8º EF","Turma":"B"},{"Aluno":"MIGUEL FIDELIS ENEDINO MARQUES","Serie":"8º EF","Turma":"B"},{"Aluno":"RHEYNER FINIZOLA MOURA TAVARES","Serie":"8º EF","Turma":"B"},{"Aluno":"RUANNY THAYS LIRA DE OLIVEIRA","Serie":"8º EF","Turma":"B"},{"Aluno":"SARAH TORRES DA SILVA SANTOS","Serie":"8º EF","Turma":"B"},{"Aluno":"SOFIA HILARIO DA SILVA","Serie":"8º EF","Turma":"B"},{"Aluno":"WILLIAM RYAN TRINDADE DOS SANTOS","Serie":"8º EF","Turma":"B"},{"Aluno":"ALEXANDRE PIETRO FERNANDES DA SILVA","Serie":"8º EF","Turma":"C"},{"Aluno":"ANA JÚLIA PONTES DA SILVA","Serie":"8º EF","Turma":"C"},{"Aluno":"CAUÃ HENRIQUE OLIVEIRA DOS SANTOS","Serie":"8º EF","Turma":"C"},{"Aluno":"DOUGLAS FELIX DA SILVA","Serie":"8º EF","Turma":"C"},{"Aluno":"EMERSON KAUÊ DOS SANTOS LIRA","Serie":"8º EF","Turma":"C"},{"Aluno":"ERICK MATIAS DE SOUZA","Serie":"8º EF","Turma":"C"},{"Aluno":"FABIO ALVES DE LIMA JUNIOR","Serie":"8º EF","Turma":"C"},{"Aluno":"GABRIELY BEATRIZ DOS SANTOS LEITE BATALHA","Serie":"8º EF","Turma":"C"},{"Aluno":"GUILHERME HENRIQUE ALVES COSTA","Serie":"8º EF","Turma":"C"},{"Aluno":"HELOISA CHERON BARROS","Serie":"8º EF","Turma":"C"},{"Aluno":"HELOISA VITÓRIA DA SILVA","Serie":"8º EF","Turma":"C"},{"Aluno":"ISABELA RIBEIRO MUNIZ","Serie":"8º EF","Turma":"C"},{"Aluno":"JOSÉ VICTOR OLIVEIRA MARINHO","Serie":"8º EF","Turma":"C"},{"Aluno":"JOÃO GABRIEL NEVES CHAVES","Serie":"8º EF","Turma":"C"},{"Aluno":"JOÃO MIGUEL DAMASCENO DE LEMOS","Serie":"8º EF","Turma":"C"},{"Aluno":"JOÃO MIGUEL SOUSA AGUIAR","Serie":"8º EF","Turma":"C"},{"Aluno":"JOÃO PEDRO DA SILVA ALMEIDA","Serie":"8º EF","Turma":"C"},{"Aluno":"JULIA NICOLE EUTALIA MARTINS","Serie":"8º EF","Turma":"C"},{"Aluno":"LAURA BEATRIZ DA SILVA RAMOS","Serie":"8º EF","Turma":"C"},{"Aluno":"LAYLA GABRIELLE DE MOURA MESQUITA","Serie":"8º EF","Turma":"C"},{"Aluno":"LIVIA VALENTINA CAVALCANTI DOS ANJOS","Serie":"8º EF","Turma":"C"},{"Aluno":"LORENA ARAUJO SILVA","Serie":"8º EF","Turma":"C"},{"Aluno":"LYVIA JULIA MENDES FERNANDES","Serie":"8º EF","Turma":"C"},{"Aluno":"MARIA EDUARDA DOS SANTOS ALBUQUERQUE","Serie":"8º EF","Turma":"C"},{"Aluno":"MARINA MOURA DOS SANTOS MESQUITA","Serie":"8º EF","Turma":"C"},{"Aluno":"MAYRA ROSEANA DA SILVA OLIVEIRA","Serie":"8º EF","Turma":"C"},{"Aluno":"NICOLAS CHARLES BARBOSA DOS SANTOS","Serie":"8º EF","Turma":"C"},{"Aluno":"RHAVYLA TAUANNE PEREIRA DE FRANÇA","Serie":"8º EF","Turma":"C"},{"Aluno":"SOPHIA VITORIA SILVA","Serie":"8º EF","Turma":"C"},{"Aluno":"TARSILA DE SOUZA ANDRADE","Serie":"8º EF","Turma":"C"},{"Aluno":"YGOR RENNAN DE OLIVEIRA FREITAS","Serie":"8º EF","Turma":"C"},{"Aluno":"ALICE VITORIA DA SILVA EMILIANO","Serie":"9º EF","Turma":"A"},{"Aluno":"ANA LAURA OLIVEIRA ANDRE DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"ANA LUIZE DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"ANDRE LUIZ OLIVEIRA DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"ANTONIO GABRIEL DA SILVA DUARTE","Serie":"9º EF","Turma":"A"},{"Aluno":"BRUNNA LUIZA PEREIRA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"CAIO VINICIUS SILVA RODRIGUES","Serie":"9º EF","Turma":"A"},{"Aluno":"CECILIA GABRIELLY DO NASCIMENTO SANTOS","Serie":"9º EF","Turma":"A"},{"Aluno":"FLAVIO GABRIEL LIMA DO REGO","Serie":"9º EF","Turma":"A"},{"Aluno":"GIOVANNA PACHECO BORGES","Serie":"9º EF","Turma":"A"},{"Aluno":"HADRIAN ANDERSON LIRA RICARTE","Serie":"9º EF","Turma":"A"},{"Aluno":"HANNA ALICIA DE ALMEIDA SALVADOR","Serie":"9º EF","Turma":"A"},{"Aluno":"HANNIEL TEOFILO DA SILVA PEREIRA","Serie":"9º EF","Turma":"A"},{"Aluno":"JAMERSON LUCAS DA SILVA ALBUQUERQUE","Serie":"9º EF","Turma":"A"},{"Aluno":"JOÃO PEDRO PEIXOTO ALMEIDA","Serie":"9º EF","Turma":"A"},{"Aluno":"JOÃO VICTOR BATISTA DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"LAUANY BEATRIZ LIRA DE FARIAS","Serie":"9º EF","Turma":"A"},{"Aluno":"LETICIA DE JESUS SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"LETICIA MARIA DE SOUZA GOMES","Serie":"9º EF","Turma":"A"},{"Aluno":"LUCAS CAVALCANTI ANDRADE","Serie":"9º EF","Turma":"A"},{"Aluno":"LUIS MIGUEL GOMES DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"MARIA EDUARDA RODRIGUES OLIVEIRA","Serie":"9º EF","Turma":"A"},{"Aluno":"MARIA ESTHER DA SILVA LIMA","Serie":"9º EF","Turma":"A"},{"Aluno":"MARIA SOPHIA DA SILVA OLIVEIRA","Serie":"9º EF","Turma":"A"},{"Aluno":"MATHEUS HENRIQUE DOS SANTOS","Serie":"9º EF","Turma":"A"},{"Aluno":"MAX GABRIEL MARTINS BARBOSA","Serie":"9º EF","Turma":"A"},{"Aluno":"MELLINA GABRIELA NASCIMENTO SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"MIGUEL COUTINHO DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"MILLENA VITORIA DOS ANJOS MORAIS","Serie":"9º EF","Turma":"A"},{"Aluno":"RAFAEL DIAS DE MORAES","Serie":"9º EF","Turma":"A"},{"Aluno":"RAFAEL DO NASCIMENTO SANTANA","Serie":"9º EF","Turma":"A"},{"Aluno":"RICHARDY RYAN ESPINDOLA DA SILVA","Serie":"9º EF","Turma":"A"},{"Aluno":"VINICIUS GABRIEL DIAS DE OLIVEIRA","Serie":"9º EF","Turma":"A"},{"Aluno":"AGATHA ELOÁ SALVIANO FERREIRA","Serie":"9º EF","Turma":"B"},{"Aluno":"ALANNA GABRIELLE DA SILVA COSTA","Serie":"9º EF","Turma":"B"},{"Aluno":"ALICIA MONTEIRO CHAVES PINHEIRO","Serie":"9º EF","Turma":"B"},{"Aluno":"ANNELISE FLAVIA MACIEL DA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"ANTONIO PEDRO NASCIMENTO MUNIZ","Serie":"9º EF","Turma":"B"},{"Aluno":"ARTHUR VICTOR GOMES DA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"BRENNO IVES DE LIMA OLIVEIRA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"CAILLANY BEATRIZ MORAIS DA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"ESTER CECILIA NUNES DA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"HEITOR LOPES GOMES DOS SANTOS","Serie":"9º EF","Turma":"B"},{"Aluno":"ISABEL VITÓRIA RODRIGUES CHAGAS","Serie":"9º EF","Turma":"B"},{"Aluno":"ISADORA EMILIA DOS ANJOS SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"JAILSON MIGUEL MELO DOS SANTOS","Serie":"9º EF","Turma":"B"},{"Aluno":"JOSE GUILHERME DE SOUZA ANDRADE","Serie":"9º EF","Turma":"B"},{"Aluno":"JULIO CESAR DE HOLANDA COSTA","Serie":"9º EF","Turma":"B"},{"Aluno":"LIRIEL BARBOSA DA SILVA BARROSO","Serie":"9º EF","Turma":"B"},{"Aluno":"LIVIA VALENTINA MONTEIRO MENDONÇA","Serie":"9º EF","Turma":"B"},{"Aluno":"LUCAS LEONARDO FERREIRA BALBINO DA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"LUIZ GUILHERME BATISTA GOUVEIA","Serie":"9º EF","Turma":"B"},{"Aluno":"MARIA CECILIA CUNHA ARAUJO E SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"MARIA LAURA MENDONÇA FERREIRA","Serie":"9º EF","Turma":"B"},{"Aluno":"MARINA ELOA RODRIGUES DE OLIVEIRA","Serie":"9º EF","Turma":"B"},{"Aluno":"MARINA TORRES CORREIA DE MELO TOMÉ","Serie":"9º EF","Turma":"B"},{"Aluno":"MARYA CLARA SANTOS SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"MARYNA RODRIGUES DA SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"PAULO GUILHERME GALVAO PEREIRA","Serie":"9º EF","Turma":"B"},{"Aluno":"RAFAEL SEVERO CORREIA E SILVA","Serie":"9º EF","Turma":"B"},{"Aluno":"SAMUEL DAVI MONTE DE ANDRADE","Serie":"9º EF","Turma":"B"},{"Aluno":"SARAH DE ALCANTARA ALVES","Serie":"9º EF","Turma":"B"},{"Aluno":"SAULO PASSOS DE SOUZA","Serie":"9º EF","Turma":"B"},{"Aluno":"VINICIUS CAMPOS DE MELO","Serie":"9º EF","Turma":"B"},{"Aluno":"WILLIAM SAMUEL DE LIMA","Serie":"9º EF","Turma":"B"},{"Aluno":"CAUANY VICTORIA DO NASCIMENTO","Serie":"9º EF","Turma":"C"},{"Aluno":"CHARLES ANDRÉ GOMES MACIEL","Serie":"9º EF","Turma":"C"},{"Aluno":"CÉSAR HENRIQUE DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"DANIEL ALBERT DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"DANILO SANTIAGO CALIXTO","Serie":"9º EF","Turma":"C"},{"Aluno":"DIEGO DAVYDSON DE FRANÇA JÚNIOR","Serie":"9º EF","Turma":"C"},{"Aluno":"DIEGO MIGUEL ALBUQUERQUE OMENA","Serie":"9º EF","Turma":"C"},{"Aluno":"ELIEL ANTONIO DOS SANTOS JUNIOR","Serie":"9º EF","Turma":"C"},{"Aluno":"ELIZA MARIA DOS ANJOS SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"GEMERSON EVANGELHO DOS SANTOS","Serie":"9º EF","Turma":"C"},{"Aluno":"GIOVANA MOTA DOS ANJOS DE ANDRADE","Serie":"9º EF","Turma":"C"},{"Aluno":"GRAZIELLE CLARA DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"IAN KAION DE BARROS DAVINO","Serie":"9º EF","Turma":"C"},{"Aluno":"ISABELA SAMARA GONSAGA ROCHA","Serie":"9º EF","Turma":"C"},{"Aluno":"IZABELLA GUILHERMINA DE SENA","Serie":"9º EF","Turma":"C"},{"Aluno":"JIULIA SOFHIA DE ARAGÃO FIGUEIREDO","Serie":"9º EF","Turma":"C"},{"Aluno":"JOÃO GUILHERME RODRIGUES DE SOUSA FIGUEIREDO","Serie":"9º EF","Turma":"C"},{"Aluno":"JOÃO LUCAS FERREIRA ARAGÃO","Serie":"9º EF","Turma":"C"},{"Aluno":"JOÃO PEDRO PEREIRA DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"JOÃO VICTOR SILVA SANTOS","Serie":"9º EF","Turma":"C"},{"Aluno":"JÚLIA MENDONÇA DE SOUZA","Serie":"9º EF","Turma":"C"},{"Aluno":"JÚLIO CÉSAR MARTINS DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"KAIO HENRIQUE SANTANA DE LIMA","Serie":"9º EF","Turma":"C"},{"Aluno":"LAURA MELISSA NOGUEIRA DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"LORENA RAQUEL GOMES DA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"LUIS GUILHERME MACIEL SOARES","Serie":"9º EF","Turma":"C"},{"Aluno":"MARIA JULIA DE OLIVEIRA PAES","Serie":"9º EF","Turma":"C"},{"Aluno":"RILLARY NICOLE MESQUITA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"SAULO DAVI AGOSTINHO DO AMARANTE","Serie":"9º EF","Turma":"C"},{"Aluno":"THAWANY VITÓRIA SOUZA SILVA","Serie":"9º EF","Turma":"C"},{"Aluno":"YLLANA VITORIA SOUZA DA COSTA","Serie":"9º EF","Turma":"C"}];
+
+let registros = JSON.parse(localStorage.getItem('mapa_regs')||'[]');
+let selectedAluno = null;
+let acFocusIdx = -1;
+
+// ══ PERSIST ══
+function save(){localStorage.setItem('mapa_regs', JSON.stringify(registros));}
+
+// ══ NAVIGATION ══
+function goPage(id, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  const titles={dashboard:'Painel geral',registro:'Novo registro',dados:'Registros lançados',alunos:'Lista de alunos',perfil:'Relatório individual'};
+  document.getElementById('topbar-title').textContent=titles[id]||id;
+  if(id==='dashboard') updateDashboard();
+  if(id==='dados') renderTabela();
+  if(id==='alunos') renderAlunos();
+}
+
+// ══ TOAST ══
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+// ══ AUTOCOMPLETE (registro) ══
+function normalize(s){return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function filterAlunos(val){
+  acFocusIdx=-1;
+  const box=document.getElementById('ac-box');
+  if(!val||val.length<2){box.classList.remove('open');return;}
+  const q=normalize(val);
+  const matches=STUDENTS.filter(s=>normalize(s.Aluno).includes(q)).slice(0,10);
+  if(!matches.length){box.classList.remove('open');return;}
+  box.innerHTML=matches.map((s,i)=>`<div class="ac-item" data-i="${i}" onmousedown="selectAluno('${s.Aluno.replace(/'/g,"\\'")}','${s.Serie}','${s.Turma}')">${highlightMatch(s.Aluno,q)}<span class="ac-meta">${s.Serie} · Turma ${s.Turma}</span></div>`).join('');
+  box.classList.add('open');
+}
+function highlightMatch(name,q){
+  const n=normalize(name);const idx=n.indexOf(q);
+  if(idx<0)return name;
+  return `<strong>${name.slice(0,idx)}</strong><span style="background:#eff6ff;color:#1d4ed8;border-radius:3px;padding:0 1px">${name.slice(idx,idx+q.length)}</span><strong>${name.slice(idx+q.length)}</strong>`;
+}
+function selectAluno(nome,serie,turma){
+  document.getElementById('inp-aluno').value=nome;
+  document.getElementById('inp-serie').value=serie;
+  document.getElementById('inp-turma').value=turma;
+  document.getElementById('ac-box').classList.remove('open');
+  const badge=document.getElementById('aluno-badge');
+  badge.style.display='block';
+  badge.innerHTML=`<span class="auto-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>${serie} · Turma ${turma} — preenchido automaticamente</span>`;
+  selectedAluno={nome,serie,turma};
+}
+function acKeydown(e){
+  const items=document.querySelectorAll('.ac-item');
+  if(!items.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();acFocusIdx=Math.min(acFocusIdx+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();acFocusIdx=Math.max(acFocusIdx-1,0);}
+  else if(e.key==='Enter'&&acFocusIdx>=0){e.preventDefault();items[acFocusIdx].dispatchEvent(new MouseEvent('mousedown'));}
+  else if(e.key==='Escape'){document.getElementById('ac-box').classList.remove('open');}
+  items.forEach((it,i)=>it.classList.toggle('focused',i===acFocusIdx));
+}
+document.addEventListener('click',e=>{if(!e.target.closest('#inp-aluno')&&!e.target.closest('#ac-box'))document.getElementById('ac-box').classList.remove('open');if(!e.target.closest('#inp-data')&&!e.target.closest('#cal-wrap'))closeCal();if(!e.target.closest('#perfil-search')&&!e.target.closest('#perfil-ac-box'))document.getElementById('perfil-ac-box').classList.remove('open');});
+
+// ══ CALENDAR ══
+let calDate=new Date();
+function toggleCal(){const w=document.getElementById('cal-wrap');if(w.classList.contains('open'))closeCal();else{renderCal();w.classList.add('open');}}
+function closeCal(){document.getElementById('cal-wrap').classList.remove('open');}
+function renderCal(){
+  const w=document.getElementById('cal-wrap');
+  const y=calDate.getFullYear(),m=calDate.getMonth();
+  const months=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const first=new Date(y,m,1).getDay();
+  const days=new Date(y,m+1,0).getDate();
+  const today=new Date();
+  const selStr=document.getElementById('inp-data').value;
+  let [sd,sm,sy]=(selStr||'//').split('/').map(Number);
+  let html=`<div class="cal-header"><button class="cal-nav" onclick="calNav(-1)">&#8249;</button><span>${months[m]} ${y}</span><button class="cal-nav" onclick="calNav(1)">&#8250;</button></div>`;
+  html+=`<div class="cal-grid">`;
+  ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>html+=`<div class="cal-day-name">${d}</div>`);
+  for(let i=0;i<first;i++)html+=`<button class="cal-day other-month" disabled></button>`;
+  for(let d=1;d<=days;d++){
+    const isToday=d===today.getDate()&&m===today.getMonth()&&y===today.getFullYear();
+    const isSel=d===sd&&m+1===sm&&y===sy;
+    html+=`<button class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="pickDate(${d},${m+1},${y})">${d}</button>`;
+  }
+  html+=`</div>`;
+  w.innerHTML=html;
+}
+function calNav(dir){calDate=new Date(calDate.getFullYear(),calDate.getMonth()+dir,1);renderCal();}
+function pickDate(d,m,y){
+  const ds=String(d).padStart(2,'0'),ms=String(m).padStart(2,'0');
+  document.getElementById('inp-data').value=`${ds}/${ms}/${y}`;
+  closeCal();
+}
+
+// ══ SAVE REGISTRO ══
+function salvarRegistro(){
+  const aluno=document.getElementById('inp-aluno').value.trim();
+  const disc=document.getElementById('inp-disc').value;
+  const nota=document.getElementById('inp-nota').value;
+  const assunto=document.getElementById('inp-assunto').value.trim();
+  const capac=document.getElementById('inp-capac').value.trim();
+  const data=document.getElementById('inp-data').value.trim();
+  if(!aluno||!disc||nota===''||!data){toast('⚠️ Preencha: aluno, disciplina, nota e data.');return;}
+  const notaNum=parseFloat(nota);
+  if(isNaN(notaNum)||notaNum<0||notaNum>10){toast('⚠️ Nota deve ser entre 0 e 10.');return;}
+  const st=STUDENTS.find(s=>s.Aluno===aluno);
+  registros.push({id:Date.now(),aluno,serie:st?st.Serie:'',turma:st?st.Turma:'',disc,nota:notaNum,assunto,capac,data,obs:document.getElementById('inp-obs').value.trim()});
+  save();updateDashboardKPIs();
+  toast('✓ Registro salvo com sucesso!');
+  limparForm();
+}
+function limparForm(){
+  ['inp-aluno','inp-serie','inp-turma','inp-nota','inp-assunto','inp-capac','inp-data','inp-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('inp-disc').value='';
+  document.getElementById('aluno-badge').style.display='none';
+  selectedAluno=null;
+}
+
+// ══ TABLE ══
+function notaBadge(n){
+  const v=parseFloat(n);
+  let cls='badge-red';if(v>=7)cls='badge-green';else if(v>=5)cls='badge-amber';
+  const pct=Math.round((v/10)*100);
+  return `<div><span class="nota-badge badge ${cls}">${v.toFixed(1)}</span><div class="nota-bar" style="width:48px"><div class="nota-bar-fill" style="width:${pct}%;background:${v>=7?'#16a34a':v>=5?'#d97706':'#dc2626'}"></div></div></div>`;
+}
+function renderTabela(filter='',serie='',disc=''){
+  let data=registros;
+  if(filter){const q=normalize(filter);data=data.filter(r=>normalize(r.aluno).includes(q));}
+  if(serie)data=data.filter(r=>r.serie===serie);
+  if(disc)data=data.filter(r=>r.disc===disc);
+  const discs=[...new Set(registros.map(r=>r.disc))].sort();
+  const sel=document.getElementById('fil-disc');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todas as disciplinas</option>'+discs.map(d=>`<option${d===cur?' selected':''}>${d}</option>`).join('');
+  const body=document.getElementById('tabela-body');
+  if(!data.length){body.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--gray-400);padding:32px">Nenhum registro encontrado.</td></tr>`;return;}
+  body.innerHTML=data.slice().reverse().map(r=>`<tr>
+    <td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.aluno}">${r.aluno}</td>
+    <td><span class="badge badge-blue">${r.serie}</span></td>
+    <td><span class="badge badge-blue">T.${r.turma}</span></td>
+    <td>${r.disc}</td>
+    <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.assunto||'—'}</td>
+    <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.capac||'—'}</td>
+    <td>${notaBadge(r.nota)}</td>
+    <td style="white-space:nowrap">${r.data}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deletar(${r.id})">✕</button></td>
+  </tr>`).join('');
+}
+function filtrarTabela(v){
+  const f=v!==undefined?v:document.querySelector('#page-dados input').value;
+  renderTabela(f,document.getElementById('fil-serie').value,document.getElementById('fil-disc').value);
+}
+function deletar(id){registros=registros.filter(r=>r.id!==id);save();renderTabela();updateDashboardKPIs();}
+function limparTodosRegistros(){if(confirm('Apagar TODOS os registros?')){registros=[];save();renderTabela();updateDashboardKPIs();}}
+
+// ══ ALUNOS TABLE ══
+function renderAlunos(filter='',serie='',turma=''){
+  const q=normalize(filter||document.querySelector('#page-alunos input').value||'');
+  serie=serie||document.getElementById('fil-aluno-serie').value;
+  turma=turma||document.getElementById('fil-aluno-turma').value;
+  let data=STUDENTS;
+  if(q)data=data.filter(s=>normalize(s.Aluno).includes(q));
+  if(serie)data=data.filter(s=>s.Serie===serie);
+  if(turma)data=data.filter(s=>s.Turma===turma);
+  const body=document.getElementById('alunos-body');
+  body.innerHTML=data.map((s,i)=>{
+    const regs=registros.filter(r=>r.aluno===s.Aluno);
+    const media=regs.length?regs.reduce((a,b)=>a+b.nota,0)/regs.length:null;
+    return `<tr>
+      <td style="color:var(--gray-400)">${i+1}</td>
+      <td style="font-weight:500">${s.Aluno}</td>
+      <td><span class="badge badge-blue">${s.Serie}</span></td>
+      <td><span class="badge badge-blue">T.${s.Turma}</span></td>
+      <td>${regs.length?`<span class="badge badge-green">${regs.length}</span>`:'<span style="color:var(--gray-300)">—</span>'}</td>
+      <td>${media!==null?notaBadge(media):'<span style="color:var(--gray-300)">—</span>'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="verPerfil('${s.Aluno.replace(/'/g,"\\'")}')">Ver perfil</button></td>
+    </tr>`;
+  }).join('');
+}
+function filtrarAlunos(v){renderAlunos(v!==undefined?v:'');}
+function verPerfil(nome){
+  goPage('perfil',document.querySelectorAll('.nav-item')[4]);
+  setTimeout(()=>{document.getElementById('perfil-search').value=nome;carregarPerfil(nome);},50);
+}
+
+// ══ PERFIL INDIVIDUAL ══
+function filterPerfilAlunos(val){
+  const box=document.getElementById('perfil-ac-box');
+  if(!val||val.length<2){box.classList.remove('open');return;}
+  const q=normalize(val);
+  const matches=STUDENTS.filter(s=>normalize(s.Aluno).includes(q)).slice(0,8);
+  if(!matches.length){box.classList.remove('open');return;}
+  box.innerHTML=matches.map(s=>`<div class="ac-item" onmousedown="carregarPerfil('${s.Aluno.replace(/'/g,"\\'")}');document.getElementById('perfil-search').value='${s.Aluno.replace(/'/g,"\\'")}'">${s.Aluno}<span class="ac-meta">${s.Serie} · T.${s.Turma}</span></div>`).join('');
+  box.classList.add('open');
+}
+
+let pChart1=null,pChart2=null;
+function carregarPerfil(nome){
+  document.getElementById('perfil-ac-box').classList.remove('open');
+  const st=STUDENTS.find(s=>s.Aluno===nome);
+  if(!st)return;
+  const regs=registros.filter(r=>r.aluno===nome);
+  document.getElementById('perfil-content').style.display='block';
+  document.getElementById('perfil-empty').style.display='none';
+  const initials=nome.split(' ').slice(0,2).map(w=>w[0]).join('');
+  document.getElementById('perfil-avatar').textContent=initials;
+  document.getElementById('perfil-nome').textContent=nome;
+  document.getElementById('perfil-meta').textContent=`${st.Serie} · Turma ${st.Turma}`;
+  document.getElementById('pstat-regs').textContent=regs.length;
+  const media=regs.length?regs.reduce((a,b)=>a+b.nota,0)/regs.length:null;
+  document.getElementById('pstat-media').textContent=media!==null?media.toFixed(1):'—';
+  const discs=[...new Set(regs.map(r=>r.disc))];
+  document.getElementById('pstat-disc').textContent=discs.length;
+  // Histórico
+  document.getElementById('perfil-hist').innerHTML=regs.length?regs.slice().reverse().map(r=>`<tr>
+    <td style="white-space:nowrap">${r.data}</td><td>${r.disc}</td>
+    <td>${r.assunto||'—'}</td><td>${r.capac||'—'}</td><td>${notaBadge(r.nota)}</td>
+  </tr>`).join(''):
+  `<tr><td colspan="5" style="text-align:center;color:var(--gray-400);padding:20px">Nenhum registro para este aluno.</td></tr>`;
+  // Gráficos
+  if(pChart1){pChart1.destroy();pChart1=null;}
+  if(pChart2){pChart2.destroy();pChart2=null;}
+  const sorted=regs.slice().sort((a,b)=>parseDate(a.data)-parseDate(b.data));
+  const ctx1=document.getElementById('pChartEvolucao').getContext('2d');
+  pChart1=new Chart(ctx1,{type:'line',data:{labels:sorted.map(r=>r.data),datasets:[{label:'Nota',data:sorted.map(r=>r.nota),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.1)',tension:.3,pointRadius:5,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{stepSize:2}}}}});
+  const discMap={};regs.forEach(r=>{if(!discMap[r.disc])discMap[r.disc]=[];discMap[r.disc].push(r.nota);});
+  const discLabels=Object.keys(discMap);
+  const discMedias=discLabels.map(d=>discMap[d].reduce((a,b)=>a+b,0)/discMap[d].length);
+  const ctx2=document.getElementById('pChartDisc').getContext('2d');
+  pChart2=new Chart(ctx2,{type:'bar',data:{labels:discLabels,datasets:[{label:'Média',data:discMedias.map(v=>parseFloat(v.toFixed(1))),backgroundColor:discMedias.map(v=>v>=7?'rgba(22,163,74,.7)':v>=5?'rgba(217,119,6,.7)':'rgba(220,38,38,.7)'),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:10}}}});
+}
+
+// ══ DASHBOARD ══
+let charts={};
+function parseDate(s){const[d,m,y]=s.split('/');return new Date(y,m-1,d);}
+function updateDashboardKPIs(){
+  document.getElementById('kpi-regs').textContent=registros.length;
+  document.getElementById('kpi-regs-sub').textContent=registros.length?`Último: ${registros[registros.length-1].data}`:'Nenhum ainda';
+  const notas=registros.map(r=>r.nota);
+  const media=notas.length?notas.reduce((a,b)=>a+b,0)/notas.length:null;
+  document.getElementById('kpi-media').textContent=media!==null?media.toFixed(1):'—';
+  const uniq=[...new Set(registros.map(r=>r.aluno))];
+  document.getElementById('kpi-avaliados').textContent=uniq.length;
+  document.getElementById('kpi-avaliados-pct').textContent=`de 435 (${Math.round(uniq.length/435*100)}%)`;
+}
+function updateDashboard(){
+  updateDashboardKPIs();
+  const seriesOrder=['5º EF','6º EF','7º EF','8º EF','9º EF'];
+  const serieCounts=seriesOrder.map(s=>STUDENTS.filter(st=>st.Serie===s).length);
+  if(charts.serie)charts.serie.destroy();
+  charts.serie=new Chart(document.getElementById('chartSerie').getContext('2d'),{type:'bar',data:{labels:seriesOrder,datasets:[{data:serieCounts,backgroundColor:['rgba(37,99,235,.7)','rgba(124,58,237,.7)','rgba(22,163,74,.7)','rgba(217,119,6,.7)','rgba(220,38,38,.7)'],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  const discMap={};registros.forEach(r=>{if(!discMap[r.disc])discMap[r.disc]=[];discMap[r.disc].push(r.nota);});
+  const dKeys=Object.keys(discMap).sort();
+  const dMedias=dKeys.map(d=>parseFloat((discMap[d].reduce((a,b)=>a+b,0)/discMap[d].length).toFixed(1)));
+  if(charts.disc)charts.disc.destroy();
+  charts.disc=new Chart(document.getElementById('chartDisc').getContext('2d'),{type:'bar',data:{labels:dKeys.length?dKeys:['—'],datasets:[{data:dMedias.length?dMedias:[0],backgroundColor:'rgba(37,99,235,.65)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:10}}}});
+  const sorted=registros.slice().sort((a,b)=>parseDate(a.data)-parseDate(b.data));
+  const dateMap={};sorted.forEach(r=>{if(!dateMap[r.data])dateMap[r.data]=[];dateMap[r.data].push(r.nota);});
+  const tLabels=Object.keys(dateMap);
+  const tMedias=tLabels.map(d=>parseFloat((dateMap[d].reduce((a,b)=>a+b,0)/dateMap[d].length).toFixed(1)));
+  if(charts.tempo)charts.tempo.destroy();
+  charts.tempo=new Chart(document.getElementById('chartTempo').getContext('2d'),{type:'line',data:{labels:tLabels.length?tLabels:['—'],datasets:[{data:tMedias.length?tMedias:[0],borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.3,fill:true,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:10}}}});
+  const hist=[0,0,0,0,0];
+  registros.forEach(r=>{const v=r.nota;if(v<4)hist[0]++;else if(v<5)hist[1]++;else if(v<7)hist[2]++;else if(v<9)hist[3]++;else hist[4]++;});
+  if(charts.hist)charts.hist.destroy();
+  charts.hist=new Chart(document.getElementById('chartHist').getContext('2d'),{type:'bar',data:{labels:['< 4','4–5','5–7','7–9','9–10'],datasets:[{data:hist,backgroundColor:['rgba(220,38,38,.7)','rgba(220,38,38,.5)','rgba(217,119,6,.7)','rgba(22,163,74,.6)','rgba(22,163,74,.9)'],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+// ══ EXPORT CSV ══
+function exportCSV(){
+  if(!registros.length){toast('Nenhum registro para exportar.');return;}
+  const hdr='Aluno,Série,Turma,Disciplina,Assunto,Capacidade,Nota,Data,Observação';
+  const rows=registros.map(r=>[r.aluno,r.serie,r.turma,r.disc,r.assunto,r.capac,r.nota,r.data,r.obs].map(v=>'"'+(v||'').toString().replace(/"/g,'""')+'"').join(','));
+  const blob=new Blob([hdr+'\n'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mapa_pedagogico.csv';a.click();
+  toast('CSV exportado!');
+}
+
+// ── init ──
+window.addEventListener('DOMContentLoaded',()=>{updateDashboard();renderAlunos();});
+</script>
+</body>
+</html>
